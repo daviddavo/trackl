@@ -3,7 +3,10 @@ import os
 import re
 import time
 import threading
+import argparse
 from guessit import guessit #Remember to use the json kind
+
+#logging.basicConfig(filename="logs/{}.log".format(int(time.time())), level=logging.DEBUG)
 
 def get_sec(time_str):
     h, m, s = time_str.split(':')
@@ -12,7 +15,7 @@ def get_sec(time_str):
 
 class Tracker():
     def __init__(self, player="mpv", percentage=70, wait_s=20):
-        self.process_name = "simkl-pytracker"
+        self.process_name = "simkl-pytracker | {}".format(player)
         self.wait_s = wait_s
         self.wait_close = 100
         self.player = player
@@ -20,10 +23,12 @@ class Tracker():
         self.percentage = percentage
         tracker_args = 0
         tracker_t = threading.Thread(target=self._tracker)#, args=tracker_args)
+        tracker_t.name = self.process_name
         tracker_t.daemon = True
 
         self.active = True
         tracker_t.start()
+        tracker_t.join()
 
     def _get_playing_file_lsof(self, player):
         try:
@@ -34,7 +39,6 @@ class Tracker():
 
         output = lsof.communicate()[0].decode('utf-8')
         fileregex = re.compile("n(.*(\.mkv|\.mp4|\.avi))")
-        filedir = re.compile("n(/.*(\.mkv|\.mp4|\.avi))")
 
         for line in output.splitlines():
             match = fileregex.match(line)
@@ -56,12 +60,19 @@ class Tracker():
         self.disable = False
 
     def _tracker(self):
+        subprocess.Popen(['notify-send', "Starting daemon"])
+        import logging
+        logging.basicConfig(filename="logs/{}.log".format(int(time.time())), level=logging.DEBUG)
+        logging.info("Daemon started @ {}".format(time.time()))
         while self.active:
             filename = self._get_playing_file_lsof(self.player)
+            print(filename)
+            logging.info(str(filename))
             if filename != False:
                 if self.trackingfile == None:
                     #[FILENAME, startime, exptime]
                     self.trackingfile = filename
+                    subprocess.Popen(['notify-send', filename])
                 else:
                     pct = ( time.time() - self.trackingfile["added"] ) \
                     /self.trackingfile["videolen"] * 100
@@ -73,13 +84,19 @@ class Tracker():
                         show = guessit(self.trackingfile["abspath"], "--json")
 
                         print("Title:", show["title"])
+                        txt = "Title: " + show["title"] + "\n"
                         if show["type"] == "episode":
-                            print("ExS:", "{}x{}".format(show["season"], show["episode"]))
+                            txt += " S{}E{}".format(str(show["season"]).zfill(2), str(show["episode"]).zfill(2))
+                            subprocess.Popen(['notify-send', filename])
                     
             else:
                 self.trackingfile = None
 
-            time.sleep(self.wait_s)
+            try:
+                time.sleep(self.wait_s)
+            except KeyboardInterrupt:
+                logging.info("Daemon stop")
+                print("Daemon stopped")
 
     def _getvideolen(self, filename):
         res = subprocess.Popen(["ffprobe", filename],
@@ -89,5 +106,26 @@ class Tracker():
 
         return ret
 
+parser = argparse.ArgumentParser(description="Scrobble to simkl")
+parser.add_argument("file", metavar="file", nargs="?", type=str, help="Filename to scrobble.", default="None")
+parser.add_argument("--daemon", action="store_true", help="If you want to autoscrobble on the background")
+args = parser.parse_args()
+
+if args.file != "None":
+    print("File:",args.file)
+    pth = os.path.abspath(args.file)
+    show = guessit(pth)
+
+    txt = "Scrobbling {}: {}".format(show["type"], show["title"])
+    if show["type"] == "episode":
+        txt += " S{}E{}".format(str(show["season"]).zfill(2), str(show["episode"]).zfill(2))    
+    print(txt)
+else:
+    if args.daemon:
+        print("Starting daemon")
+        tr = Tracker("mpv", 10, 10)
+    else:
+        parser.print_help()
+
 #Example
-tr = Tracker("mpv", 70, 10)
+#tr = Tracker("mpv", 70, 10)
