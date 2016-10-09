@@ -15,7 +15,7 @@ def get_sec(time_str):
 
 class Tracker():
     def __init__(self, player="mpv", percentage=70, wait_s=20):
-        self.process_name = "simkl-pytracker | {}".format(player)
+        self.process_name = "simkl-pytracker-{}".format(player)
         self.wait_s = wait_s
         self.wait_close = 100
         self.player = player
@@ -57,12 +57,13 @@ class Tracker():
     def enable(self):
         self.active = True
     def disable(self):
-        self.disable = False
+        self.active = False
 
     def _tracker(self):
         subprocess.Popen(['notify-send', "Starting daemon"])
         import logging
-        logging.basicConfig(filename="logs/{}.log".format(int(time.time())), level=logging.DEBUG)
+        logging.basicConfig(filename="logs/{}.log".format(int(time.time())),
+         level=logging.DEBUG)
         logging.info("Daemon started @ {}".format(time.time()))
         while self.active:
             filename = self._get_playing_file_lsof(self.player)
@@ -72,7 +73,12 @@ class Tracker():
                 if self.trackingfile == None:
                     #[FILENAME, startime, exptime]
                     self.trackingfile = filename
-                    subprocess.Popen(['notify-send', filename])
+                    g = guessit(filename["abspath"])
+                    txt = g["title"]
+                    if g["type"] == "episode":
+                        txt += "\nS{}E{}".format(str(g["season"]).zfill(2),
+                             str(g["episode"]).zfill(2))
+                    subprocess.Popen(['notify-send', "-i", "tmp.png", txt])
                 else:
                     pct = ( time.time() - self.trackingfile["added"] ) \
                     /self.trackingfile["videolen"] * 100
@@ -86,7 +92,8 @@ class Tracker():
                         print("Title:", show["title"])
                         txt = "Title: " + show["title"] + "\n"
                         if show["type"] == "episode":
-                            txt += " S{}E{}".format(str(show["season"]).zfill(2), str(show["episode"]).zfill(2))
+                            txt += " S{}E{}".format(str(show["season"]).zfill(2),
+                             str(show["episode"]).zfill(2))
                             subprocess.Popen(['notify-send', filename])
                     
             else:
@@ -107,8 +114,10 @@ class Tracker():
         return ret
 
 parser = argparse.ArgumentParser(description="Scrobble to simkl")
-parser.add_argument("file", metavar="file", nargs="?", type=str, help="Filename to scrobble.", default="None")
-parser.add_argument("--daemon", action="store_true", help="If you want to autoscrobble on the background")
+parser.add_argument("file", metavar="file", nargs="?", type=str, 
+    help="Filename to scrobble.", default="None")
+parser.add_argument("--daemon", action="store_true", 
+    help="If you want to autoscrobble on the background")
 args = parser.parse_args()
 
 if args.file != "None":
@@ -118,7 +127,8 @@ if args.file != "None":
 
     txt = "Scrobbling {}: {}".format(show["type"], show["title"])
     if show["type"] == "episode":
-        txt += " S{}E{}".format(str(show["season"]).zfill(2), str(show["episode"]).zfill(2))    
+        txt += " S{}E{}".format(str(show["season"]).zfill(2), 
+            str(show["episode"]).zfill(2))    
     print(txt)
 else:
     if args.daemon:
