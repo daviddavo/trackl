@@ -20,7 +20,6 @@ import os
 import re
 import time
 import threading
-import argparse
 from guessit import guessit #Remember to use the json kind
 
 #logging.basicConfig(filename="logs/{}.log".format(int(time.time())), level=logging.DEBUG)
@@ -129,30 +128,6 @@ class Tracker():
          if "Duration" in x.decode("utf-8")][0].strip(" ").split(",")[0][10:]
 
         return ret
-
-parser = argparse.ArgumentParser(description="Scrobble to simkl")
-parser.add_argument("file", metavar="file", nargs="?", type=str, 
-    help="Filename to scrobble.", default="None")
-parser.add_argument("--daemon", action="store_true", 
-    help="If you want to autoscrobble on the background")
-args = parser.parse_args()
-
-if args.file != "None":
-    print("File:",args.file)
-    pth = os.path.abspath(args.file)
-    show = guessit(pth)
-
-    txt = "Scrobbling {}: {}".format(show["type"], show["title"])
-    if show["type"] == "episode":
-        txt += " S{}E{}".format(str(show["season"]).zfill(2), 
-            str(show["episode"]).zfill(2))    
-    print(txt)
-else:
-    if args.daemon:
-        print("Starting daemon")
-        tr = Tracker("mpv", 10, 10)
-    else:
-        parser.print_help()
 
 #Example
 #tr = Tracker("mpv", 70, 10)

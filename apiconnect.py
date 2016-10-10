@@ -17,15 +17,17 @@
 '''
 
 import time
+import os
 import http.client
 import json
+path = os.path.dirname(__file__)
+prompt = "Hello again, {}"
 
-with open(".api", "r") as a:
+with open(path + "/.api", "r") as a:
     apikey = a.readline().strip("\n").strip(" ") #Also called client_id
     secret = a.readline().strip("\n").strip(" ")
-    print("Apikey: ", apikey)
-    print("Secret: ", secret)
-atoken = None
+    #print("Apikey: ", apikey)
+    #print("Secret: ", secret)
 
 redirect_uri = "http://simkl.com"
 headers = {"Content-Type": "application/json",
@@ -44,28 +46,25 @@ def test():
     conn = http.client.HTTPSConnection("api.simkl.com") #MR ROBOT: 452264
     conn.request("GET", "/sync/collection", headers=headers)
     r = conn.getresponse() #302 = Found
-    print(r)
-    print(r.status, r.reason)
-    print(r.read())
+    #print(r.status, r.reason)
+    #print(r.read())
 
     conn.close()
 
 def login():
-    global atoken
-    
     t = "/oauth/pin?client_id="
     t += apikey + "&redirect=" + redirect_uri
     log = http.client.HTTPSConnection("api.simkl.com")
     log.request("GET", t, headers=headers)
     r = log.getresponse()
-    print(r.status, r.reason)
+    #print(r.status, r.reason)
     rdic = json.loads(r.read().decode("utf-8"))
 
-    print(rdic)
+    #print(rdic)
     print("Now you need to connect the app with your account")
-    print("Enter the following url: {}".format(rdic["verification_url"]))
     ucode = rdic["user_code"]
-    print("And enter this code: {}".format(ucode))
+    print("Enter the following url: {}".format(rdic["verification_url"]
+        +"/"+rdic["user_code"]))
 
     i = 0
     running = True
@@ -86,10 +85,41 @@ def login():
             log.request("GET", t, headers=headers)
             r = json.loads(log.getresponse().read().decode("utf-8"))
             if r["result"] == "OK":
+                print("")
                 atoken = r["access_token"]
                 running = False
-                print(atoken)
+
+                with open(os.path.dirname(__file__) + "/.token", "w") as f:
+                    f.write(atoken)
+
+                header = {"Content-Type": "application/json",
+                    "simkl-api-key": apikey,
+                    "authorization": atoken}
+                
+                log.request("GET", "/users/settings", headers=header)
+                r = log.getresponse()
+                #print(r.status, r.reason)
+                #print(r.read().decode("utf-8"))
+                rdic = json.loads(r.read().decode("utf-8"))
+                print("Login succesfull, hello {}".format(rdic["user"]["name"]))
+
+                return atoken
 
     log.close()
+    return False
 
-login()
+def logged():
+    global prompt
+    if os.path.isfile(path + "/.token"):
+        with open(path + "/.token", "r") as f:
+            tk = f.readline().strip("\n").strip(" ")
+            log = http.client.HTTPSConnection("api.simkl.com")
+            header = {"Content-Type": "application/json",
+                    "simkl-api-key": apikey,
+                    "authorization": tk}
+            log.request("GET", "/users/settings", headers=header)
+            rdic = json.loads(log.getresponse().read().decode("utf-8"))
+            prompt = prompt.format(rdic["user"]["name"])
+            return tk
+    else:
+        return False
