@@ -23,6 +23,8 @@ import json
 path = os.path.dirname(__file__)
 prompt = "Hello again, {}"
 
+trackl_configdir = os.path.expanduser("~/.config/trackl")
+
 with open(path + "/.api", "r") as a:
     apikey = a.readline().strip("\n").strip(" ") #Also called client_id
     secret = a.readline().strip("\n").strip(" ")
@@ -89,7 +91,7 @@ def login():
                 atoken = r["access_token"]
                 running = False
 
-                with open(os.path.dirname(__file__) + "/.token", "w") as f:
+                with open(trackl_configdir + "/.token", "w") as f:
                     f.write(atoken)
 
                 header = {"Content-Type": "application/json",
@@ -110,8 +112,8 @@ def login():
 
 def logged():
     global prompt
-    if os.path.isfile(path + "/.token"):
-        with open(path + "/.token", "r") as f:
+    if os.path.isfile(trackl_configdir + "/.token"):
+        with open(trackl_configdir + "/.token", "r") as f:
             tk = f.readline().strip("\n").strip(" ")
             log = http.client.HTTPSConnection("api.simkl.com")
             header = {"Content-Type": "application/json",
