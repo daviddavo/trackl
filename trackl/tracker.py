@@ -21,6 +21,9 @@ import re
 import time
 import threading
 from guessit import guessit #Remember to use the json kind
+from trackl import apiconnect
+import notify2 as notify
+notify.init("trackl")
 
 #logging.basicConfig(filename="logs/{}.log".format(int(time.time())), level=logging.DEBUG)
 
@@ -77,14 +80,9 @@ class Tracker():
 
     def _tracker(self):
         subprocess.Popen(['notify-send', "Starting daemon"])
-        import logging
-        logging.basicConfig(filename="logs/{}.log".format(int(time.time())),
-         level=logging.DEBUG)
-        logging.info("Daemon started @ {}".format(time.time()))
         while self.active:
             filename = self._get_playing_file_lsof(self.player)
             print(filename)
-            logging.info(str(filename))
             if filename != False:
                 if self.trackingfile == None:
                     #[FILENAME, startime, exptime]
@@ -95,6 +93,7 @@ class Tracker():
                         txt += "\nS{}E{}".format(str(g["season"]).zfill(2),
                              str(g["episode"]).zfill(2))
                     subprocess.Popen(['notify-send', "-i", "tmp.png", txt])
+                    self.trackingfile["scrobbled"] = False
                 else:
                     pct = ( time.time() - self.trackingfile["added"] ) \
                     /self.trackingfile["videolen"] * 100
@@ -102,7 +101,7 @@ class Tracker():
                     print("Time played:", time.strftime("%H:%M:%S", 
                         time.gmtime(time.time() - self.trackingfile["added"])))
 
-                    if pct >= self.percentage:
+                    if pct >= self.percentage and not self.trackingfile["scrobbled"]:
                         show = guessit(self.trackingfile["abspath"], "--json")
 
                         print("Title:", show["title"])
@@ -110,7 +109,13 @@ class Tracker():
                         if show["type"] == "episode":
                             txt += " S{}E{}".format(str(show["season"]).zfill(2),
                              str(show["episode"]).zfill(2))
-                            subprocess.Popen(['notify-send', filename])
+
+                        apiconnect.scrobble_show( self.trackingfile["abspath"] )
+                        n = notify.Notification(txt, icon="trackl/resources/logo_simkl_black_with_white_bg.png")
+                        n.show()
+                        self.trackingfile["scrobbled"] = True
+                    elif self.trackingfile["scrobbled"]:
+                        pass
                     
             else:
                 self.trackingfile = None

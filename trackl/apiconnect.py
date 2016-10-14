@@ -20,6 +20,7 @@ import time
 import os
 import http.client
 import json
+import guessit
 path = os.path.dirname(__file__)
 prompt = "Hello again, {}"
 
@@ -38,20 +39,49 @@ headers = {"Content-Type": "application/json",
 def scrobble_movie(movie_name):
     pass
 
-def scrobble_show(show_name, season, episode):
-    pass
+def scrobble_show(filename):
+    con = http.client.HTTPSConnection("api.simkl.com")
+    headers["authorization"] = logged()
 
-def test():
-    headers = {"Content-Type": "application/json",
-    "simkl-api-key": apikey,
-    "authorization": atoken}
-    conn = http.client.HTTPSConnection("api.simkl.com") #MR ROBOT: 452264
-    conn.request("GET", "/sync/collection", headers=headers)
-    r = conn.getresponse() #302 = Found
+    values = {"file":filename}
+    values = json.dumps(values)
+    con.request("GET", "/search/file/", body=values, headers=headers)
+    r = con.getresponse()
     #print(r.status, r.reason)
-    #print(r.read())
+    dic = json.loads(r.read().decode("utf-8"))
+    print(dic)
+    tosend = {}
+    if dic == []:
+        return False
+    elif dic["type"] == "episode":
+        episode = {}
+        tosend["episodes"] = []
+        episode["ids"] = dic["episode"]["ids"]
+        episode["watched_at"] = time.strftime('%Y-%m-%d %H:%M:%S')
 
-    conn.close()
+        tosend["episodes"].append(episode)
+        #tosend = {"episodes":[{"watched_at":"2016-10-14 16:28:00", "ids":{"hulu":681868}}]}
+    elif dic["type"] == "movie":
+        movie = {}
+        tosend["movies"] = []
+        movie["ids"] = dic["movie"]["ids"]
+        movie["watched_at"] = time.strftime('%Y-%m-%d %H:%M:%S')
+        tosend["movies"].append(movie)
+
+    tosendj = json.dumps(tosend)
+    #print(tosendj)
+    con.request("POST", "/sync/history/", body=tosendj, headers=headers)
+    r = con.getresponse()
+    #print(r.status, r.reason)
+
+    print()
+    rdic = json.loads(r.read().decode("utf-8"))["not_found"]
+    #print(rdic)
+    for i in rdic:
+        if rdic[i] != []:
+            return False
+
+    return dic
 
 def login():
     t = "/oauth/pin?client_id="
@@ -91,7 +121,7 @@ def login():
                 atoken = r["access_token"]
                 running = False
 
-                with open(trackl_configdir + "/.token", "w") as f:
+                with open(trackl_configdir + "/token", "w") as f:
                     f.write(atoken)
 
                 header = {"Content-Type": "application/json",
@@ -103,7 +133,8 @@ def login():
                 #print(r.status, r.reason)
                 #print(r.read().decode("utf-8"))
                 rdic = json.loads(r.read().decode("utf-8"))
-                print("Login succesfull, hello {}".format(rdic["user"]["name"]))
+                global prompt
+                prompt = "Login succesfull, hello {}".format(rdic["user"]["name"])
 
                 return atoken
 
@@ -112,16 +143,17 @@ def login():
 
 def logged():
     global prompt
-    if os.path.isfile(trackl_configdir + "/.token"):
-        with open(trackl_configdir + "/.token", "r") as f:
+    if os.path.isfile(trackl_configdir + "/token"):
+        with open(trackl_configdir + "/token", "r") as f:
             tk = f.readline().strip("\n").strip(" ")
-            log = http.client.HTTPSConnection("api.simkl.com")
-            header = {"Content-Type": "application/json",
-                    "simkl-api-key": apikey,
-                    "authorization": tk}
-            log.request("GET", "/users/settings", headers=header)
-            rdic = json.loads(log.getresponse().read().decode("utf-8"))
-            prompt = prompt.format(rdic["user"]["name"])
+            if "{}" in prompt:
+                log = http.client.HTTPSConnection("api.simkl.com")
+                header = {"Content-Type": "application/json",
+                        "simkl-api-key": apikey,
+                        "authorization": tk}
+                log.request("GET", "/users/settings", headers=header)
+                rdic = json.loads(log.getresponse().read().decode("utf-8"))
+                prompt = prompt.format(rdic["user"]["name"])
             return tk
     else:
         return False

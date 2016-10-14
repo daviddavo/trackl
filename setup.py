@@ -8,7 +8,9 @@ except IOError:
 NAME = "Trackl"
 VERSION = "0.1"
 REQUIREMENTS = [
-"guessit"]
+"guessit",
+"notify2"
+]
 EXTRA_REQUIREMENTS = { #Here goes Gtk, Qt or whatever
 }
 

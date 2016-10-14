@@ -37,7 +37,10 @@ def main():
     args = parser.parse_args()
 
     if args.login:
-        apiconnect.login()
+        if apiconnect.login() != False:
+            print(apiconnect.prompt)
+        else:
+            print("Login failed")
         sys.exit()
 
     if args.file != "None":
@@ -46,12 +49,18 @@ def main():
                 colored(apiconnect.prompt.split(", ")[1], 'blue'))
             print("File:",args.file)
             pth = os.path.abspath(args.file)
-            show = guessit.guessit(pth)
 
-            txt = "Scrobbling {}: {}".format(show["type"], show["title"])
-            if show["type"] == "episode":
-                txt += " S{}E{}".format(str(show["season"]).zfill(2), 
-                    str(show["episode"]).zfill(2))    
+            r = apiconnect.scrobble_show(pth)
+            #print(r)
+            if r == False:
+                txt = "Error at scrobble"
+            else:
+                if r["type"] == "episode":
+                    txt = "Scrobbling episode: {}".format(r["show"]["title"])
+                    txt += " S{}E{}".format(str(r["episode"]["season"]).zfill(2), 
+                        str(r["episode"]["episode"]).zfill(2))
+                elif r["type"] == "movie":
+                    txt = "Not yet"  
             print(txt)
 
         else:
@@ -59,7 +68,7 @@ def main():
     else:
         if args.daemon:
             print("Starting daemon")
-            tr = tracker.Tracker("mpv", 10, 10)
+            tr = tracker.Tracker("mpv", 60, 6)
         else:
             parser.print_help()
 

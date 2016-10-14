@@ -9,6 +9,7 @@ Based on trackma (https://github.com/z411/trackma)
 ## DONATIONS
 
 Coinbase account: https://www.coinbase.com/daviddavo
+
 Bitcoin wallet: 1PcbSQrBddJszsTiRhqHyLntp7Lxfuyaio
 
 Thanks!
