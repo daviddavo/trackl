@@ -110,7 +110,7 @@ class Tracker():
                             txt += " S{}E{}".format(str(show["season"]).zfill(2),
                              str(show["episode"]).zfill(2))
 
-                        apiconnect.scrobble_show( self.trackingfile["abspath"] )
+                        apiconnect.scrobble_from_filename( self.trackingfile["abspath"] )
                         n = notify.Notification(txt, icon="trackl/resources/logo_simkl_black_with_white_bg.png")
                         n.show()
                         self.trackingfile["scrobbled"] = True

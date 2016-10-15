@@ -27,19 +27,14 @@ prompt = "Hello again, {}"
 trackl_configdir = os.path.expanduser("~/.config/trackl")
 
 with open(path + "/.api", "r") as a:
-    apikey = a.readline().strip("\n").strip(" ") #Also called client_id
+    APIKEY = a.readline().strip("\n").strip(" ") #Also called client_id
     secret = a.readline().strip("\n").strip(" ")
-    #print("Apikey: ", apikey)
-    #print("Secret: ", secret)
 
 redirect_uri = "http://simkl.com"
 headers = {"Content-Type": "application/json",
-        "simkl-api-key": apikey}
+        "simkl-api-key": APIKEY}
 
-def scrobble_movie(movie_name):
-    pass
-
-def scrobble_show(filename):
+def scrobble_from_filename(filename):
     con = http.client.HTTPSConnection("api.simkl.com")
     headers["authorization"] = logged()
 
@@ -47,9 +42,11 @@ def scrobble_show(filename):
     values = json.dumps(values)
     con.request("GET", "/search/file/", body=values, headers=headers)
     r = con.getresponse()
-    #print(r.status, r.reason)
-    dic = json.loads(r.read().decode("utf-8"))
-    print(dic)
+    print(r.status, r.reason)
+    r = r.read().decode("utf-8")
+    r2 = r.split("\n")
+    dic = json.loads(r2[len(r2)-1])
+    #print(dic)
     tosend = {}
     if dic == []:
         return False
@@ -71,12 +68,11 @@ def scrobble_show(filename):
     tosendj = json.dumps(tosend)
     #print(tosendj)
     con.request("POST", "/sync/history/", body=tosendj, headers=headers)
-    r = con.getresponse()
     #print(r.status, r.reason)
 
     print()
-    rdic = json.loads(r.read().decode("utf-8"))["not_found"]
-    #print(rdic)
+    rdic = json.loads(con.getresponse().read().decode("utf-8"))["not_found"]
+    print(rdic)
     for i in rdic:
         if rdic[i] != []:
             return False
@@ -85,7 +81,7 @@ def scrobble_show(filename):
 
 def login():
     t = "/oauth/pin?client_id="
-    t += apikey + "&redirect=" + redirect_uri
+    t += APIKEY + "&redirect=" + redirect_uri
     log = http.client.HTTPSConnection("api.simkl.com")
     log.request("GET", t, headers=headers)
     r = log.getresponse()
@@ -113,7 +109,7 @@ def login():
             rdic["expires_in"]), end="\r")
 
         if rdic["expires_in"] % 6 == 0:
-            t = "/oauth/pin/" + ucode + "?client_id=" + apikey
+            t = "/oauth/pin/" + ucode + "?client_id=" + APIKEY
             log.request("GET", t, headers=headers)
             r = json.loads(log.getresponse().read().decode("utf-8"))
             if r["result"] == "OK":
@@ -125,7 +121,7 @@ def login():
                     f.write(atoken)
 
                 header = {"Content-Type": "application/json",
-                    "simkl-api-key": apikey,
+                    "simkl-api-key": APIKEY,
                     "authorization": atoken}
                 
                 log.request("GET", "/users/settings", headers=header)
@@ -149,7 +145,7 @@ def logged():
             if "{}" in prompt:
                 log = http.client.HTTPSConnection("api.simkl.com")
                 header = {"Content-Type": "application/json",
-                        "simkl-api-key": apikey,
+                        "simkl-api-key": APIKEY,
                         "authorization": tk}
                 log.request("GET", "/users/settings", headers=header)
                 rdic = json.loads(log.getresponse().read().decode("utf-8"))

@@ -50,7 +50,7 @@ def main():
             print("File:",args.file)
             pth = os.path.abspath(args.file)
 
-            r = apiconnect.scrobble_show(pth)
+            r = apiconnect.scrobble_from_filename(pth)
             #print(r)
             if r == False:
                 txt = "Error at scrobble"
