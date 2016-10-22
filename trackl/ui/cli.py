@@ -20,11 +20,15 @@
 
 import argparse
 import os, sys
-import guessit
+import guessit, logging
 from termcolor import colored
 
 from trackl import tracker
 from trackl import apiconnect
+
+trackl_configdir = os.path.expanduser("~/.config/trackl")
+logging.basicConfig(filename=trackl_configdir + "/log.log", level=logging.DEBUG)
+logging.debug("cli loaded")
 
 def main():
     parser = argparse.ArgumentParser(description="Scrobble to simkl")

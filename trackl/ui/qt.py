@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 '''
     Trackl: Multiplatform simkl tracker
     Copyright (C) 2016  David Davó   david@ddavo.me
@@ -16,5 +18,18 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+import sys
+from trackl.ui.QtUi import Ui_MainWindow
+from PyQt5 import QtCore, QtGui, QtWidgets
+
 from trackl import tracker
 from trackl import apiconnect
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    dialog=QtWidgets.QMainWindow()
+
+    prog = Ui_MainWindow.__init__(dialog)
+
+    dialog.show()
+    sys.exit(app.exec_())

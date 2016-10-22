@@ -16,15 +16,19 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-import time
-import os
+import time, os
 import http.client
 import json
+import logging
 import guessit
+
 path = os.path.dirname(__file__)
+username = "NOT LOGGED IN"
 prompt = "Hello again, {}"
 
 trackl_configdir = os.path.expanduser("~/.config/trackl")
+logging.basicConfig(filename=trackl_configdir + "/log.log", level=logging.DEBUG)
+logging.debug("apiconnect loaded")
 
 with open(path + "/.api", "r") as a:
     APIKEY = a.readline().strip("\n").strip(" ") #Also called client_id
@@ -33,6 +37,19 @@ with open(path + "/.api", "r") as a:
 redirect_uri = "http://simkl.com"
 headers = {"Content-Type": "application/json",
         "simkl-api-key": APIKEY}
+
+class Engine:
+    def __init__(self):
+        pass
+
+    def get_watched(self, typestring):
+        con = http.client.HTTPSConnection("api.simkl.com")
+        headers["authorization"] = logged()
+        con.request("GET", "/sync/all-watched/" + typestring, headers=headers)
+        r = con.getresponse()
+        r = json.loads(r.read().decode("utf-8"))
+        return r
+
 
 def scrobble_from_filename(filename):
     con = http.client.HTTPSConnection("api.simkl.com")
@@ -139,6 +156,7 @@ def login():
 
 def logged():
     global prompt
+    global username
     if os.path.isfile(trackl_configdir + "/token"):
         with open(trackl_configdir + "/token", "r") as f:
             tk = f.readline().strip("\n").strip(" ")
@@ -149,6 +167,7 @@ def logged():
                         "authorization": tk}
                 log.request("GET", "/users/settings", headers=header)
                 rdic = json.loads(log.getresponse().read().decode("utf-8"))
+                username = rdic["user"]["name"]
                 prompt = prompt.format(rdic["user"]["name"])
             return tk
     else:

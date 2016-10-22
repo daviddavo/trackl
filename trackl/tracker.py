@@ -19,13 +19,15 @@ import subprocess
 import os
 import re
 import time
-import threading
+import threading, logging
 from guessit import guessit #Remember to use the json kind
 from trackl import apiconnect
 import notify2 as notify
 notify.init("trackl")
 
-#logging.basicConfig(filename="logs/{}.log".format(int(time.time())), level=logging.DEBUG)
+trackl_configdir = os.path.expanduser("~/.config/trackl")
+logging.basicConfig(filename=trackl_configdir + "/log.log", level=logging.DEBUG)
+logging.debug("Tracker loaded")
 
 def get_sec(time_str):
     h, m, s = time_str.split(':')
@@ -33,7 +35,7 @@ def get_sec(time_str):
     return int(h) * 3600 + int(m) * 60 + int(s) + int(cs)/100
 
 class Tracker():
-    def __init__(self, player="mpv", percentage=70, wait_s=20):
+    def __init__(self, player="mpv,vlc", percentage=70, wait_s=20):
         self.process_name = "simkl-pytracker-{}".format(player)
         self.wait_s = wait_s
         self.wait_close = 100
@@ -50,26 +52,27 @@ class Tracker():
         tracker_t.join()
 
     def _get_playing_file_lsof(self, player):
-        try:
-            lsof = subprocess.Popen(['lsof', '+w', '-n', '-c', ''.join(
-                ['/', player, '/']), '-Fn'], stdout=subprocess.PIPE)
-        except OSError:
-            return False
+        for i in player.split(","):
+            try:
+                lsof = subprocess.Popen(['lsof', '+w', '-n', '-c', ''.join(
+                    ['/', player, '/']), '-Fn'], stdout=subprocess.PIPE)
+            except OSError:
+                return False
 
-        output = lsof.communicate()[0].decode('utf-8')
-        fileregex = re.compile("n(.*(\.mkv|\.mp4|\.avi))")
+            output = lsof.communicate()[0].decode('utf-8')
+            fileregex = re.compile("n(.*(\.mkv|\.mp4|\.avi))")
 
-        for line in output.splitlines():
-            match = fileregex.match(line)
-            if match is not None:
-                trcfile = dict()
-                trcfile["abspath"] = os.path.abspath(match.group(1))
-                trcfile["videolen"] = get_sec(self._getvideolen(trcfile["abspath"]))
-                trcfile["filename"] = os.path.basename(match.group(1))
-                trcfile["added"]    = time.time()
-                print("Path:", trcfile["abspath"])
-                print("Video len:", self._getvideolen(trcfile["abspath"]))
-                return trcfile
+            for line in output.splitlines():
+                match = fileregex.match(line)
+                if match is not None:
+                    trcfile = dict()
+                    trcfile["abspath"] = os.path.abspath(match.group(1))
+                    trcfile["videolen"] = get_sec(self._getvideolen(trcfile["abspath"]))
+                    trcfile["filename"] = os.path.basename(match.group(1))
+                    trcfile["added"]    = time.time()
+                    print("Path:", trcfile["abspath"])
+                    print("Video len:", self._getvideolen(trcfile["abspath"]))
+                    return trcfile
 
         return False
 
