@@ -17,6 +17,7 @@
 '''
 import os, sys, logging
 import xml.etree.ElementTree as xmltree
+import urllib.request
 
 from trackl import tracker
 from trackl import apiconnect
@@ -30,8 +31,10 @@ try:
     import gi
     gi.require_version('Gtk', '3.0')
     from gi.repository import Gtk, GObject, Gdk, GdkPixbuf
-except:
+    from gi.repository.GdkPixbuf import Pixbuf
+except Exception:
     lprint("Por favor, instala PyGObject en tu ordenador. \n  En ubuntu suele ser 'apt-get install python3-gi'\n  En Archlinux es 'pacman -S python-gobject'")
+    logging.ERROR(Exception)
     sys.exit()
 
 maindir, this_filename = os.path.split(__file__)
@@ -54,9 +57,12 @@ except Exception as e:
     sys.exit()
 
 class mainWindow(Gtk.Window):
+    allkeys = set()
     def __init__(self):
         print("Starting interface")
         self.mainwindow = builder.get_object("MainWindow")
+        self.mainwindow.connect("key-press-event", self.on_key_press_event)
+        self.mainwindow.connect("key-release-event", self.on_key_realease_event)
 
         handlers = {
         "onDeleteWindow":   exit,
@@ -67,28 +73,22 @@ class mainWindow(Gtk.Window):
         self.engine = apiconnect.Engine()
         self.show_watched()
         builder.get_object("label-username").set_text(apiconnect.username)
+        self.tracker = tracker.Tracker(self)
 
     def show_watched(self):
-        self.watching_TreeView = builder.get_object("watching-treeview")
-        self.watching_store = Gtk.ListStore(str, str, str, str)
-        self.watching_TreeView.set_model(self.watching_store)
-        self.completed_TreeView = builder.get_object("completed-treeview")
-        self.completed_store = Gtk.ListStore(str,str,str,str)
-        self.completed_TreeView.set_model(self.completed_store)
-        self.ptw_TreeView = builder.get_object("ptw-treeview")
-        self.ptw_store = Gtk.ListStore(str,str,str,str)
-        self.ptw_TreeView.set_model(self.ptw_store)
-        self.dropped_TreeView = builder.get_object("dropped-treeview")
-        self.dropped_store = Gtk.ListStore(str,str,str,str)
-        self.dropped_TreeView.set_model(self.dropped_store)
+        self.tree_dic = dict()
+        for each in ["watching", "completed", "plantowatch", "dropped"]:
+            self.tree_dic[each] = (builder.get_object(each + "-treeview"),
+                Gtk.ListStore(str, str, str, str, str))
+            self.tree_dic[each][0].set_model(self.tree_dic[each][1])
 
-        for i, column_title in enumerate(["Title", "Next", "Status", "Type"]):
-            for j in [self.watching_TreeView, self.completed_TreeView, 
-                self.ptw_TreeView, self.dropped_TreeView]:
+        for i, column_title in enumerate(["Title", "Next", "Score",
+            "Status", "Type"]):
+            for row in self.tree_dic.values():
                 renderer = Gtk.CellRendererText()
                 column = Gtk.TreeViewColumn(column_title, renderer, text=i)
                 column.set_sort_column_id(i)
-                j.append_column(column)
+                row[0].append_column(column)
 
         wdic = self.engine.get_watched("")
         #print(wdic)
@@ -96,26 +96,75 @@ class mainWindow(Gtk.Window):
             for lst in wdic[x]:
                 #print(lst)
                 st = [x for x in list(lst.keys()) if x in ["movie", "show"]][0]
+                logging.debug(lst[st])
                 nxt = "None"
                 if not st == "movie":
-                    nxt == "S{}E{}"
+                    nxt = "S{SEASON}E{EPISODE}"
                 tmplst = [
-                    lst[st]['title'], nxt, lst[st]["status"], st
+                    lst[st]['title'], nxt, str(lst[st]["rate"]), lst[st]["status"], st
                 ]
                 #print(tmplst)
-                if lst[st]["status"] == "watching":
-                    row = self.watching_store.append(tmplst)
-                elif lst[st]["status"] == "completed":
-                    row = self.completed_store.append(tmplst)
-                elif lst[st]["status"] == "plantowatch":
-                    row = self.ptw_store.append(tmplst)
-                elif lst[st]["status"] == "dropped":
-                    row = self.dropped_store.append(tmplst)
+                row = self.tree_dic[lst[st]["status"]][1].append(tmplst)
 
-        self.watching_TreeView.show_all()
-        self.completed_TreeView.show_all()
-        self.ptw_TreeView.show_all()
-        #row = self.store.append(lst)
+        def on_select(widget, *args):
+            treeview = widget.get_tree_view()
+
+            showname = treeview.get_model().get_value(widget.get_selected()[1],0)
+            builder.get_object("label-showname").set_text(showname)
+
+            '''
+            url = "http://3g28wn33sno63ljjq514qr87.wpengine.netdna-cdn.com/wp-content/uploads/2015/10/Star-Wars-Poster-700x1068.jpg"
+            response = urllib.request.urlopen(url)
+            fname =  trackl_configdir + "/images/"+ url.split("/")[-1]
+            f = open(fname, "wb")
+            f.write(response.read())
+            f.close()
+            response.close()
+            image = builder.get_object("show_image")
+            pixbuf = Pixbuf.new_from_file(fname)
+            pixbuf = pixbuf.scale_simple(100, 150, GdkPixbuf.InterpType.BILINEAR)
+            image.set_from_pixbuf(pixbuf)
+            '''
+
+        for val,key in self.tree_dic.items():
+            key[0].show_all()
+            select = key[0].get_selection()
+            select.connect("changed", on_select)
+
+    def on_key_press_event(self, widget, event):
+        keyname = event.keyval
+        print(keyname, Gdk.keyval_name(keyname))
+        aks = self.__class__.allkeys
+        nb = builder.get_object("mainnotebook")
+        if not keyname in aks:
+            aks.add(int(keyname))
+
+        if (65056 in aks) and (65507 in aks):
+            nb.prev_page()
+        elif (65507 in aks) and (65289 in aks):
+            nb.next_page()
+        if 65507 in aks and 113 in aks:
+            exit()
+        elif 65507 in aks and 114 in aks:
+            restart()
+
+    def on_key_realease_event(self,widget,event):
+        aks = self.__class__.allkeys
+        aks.remove(event.keyval)
+
+    def _update_scrobbling(self, txt, percent=0,finished=False):
+        if not finished:
+            infobar = builder.get_object("infobar")
+            inforevealer = builder.get_object("inforevealer")
+            label = builder.get_object("infobar_label")
+            label.set_text(txt.replace("\n", " "))
+            inforevealer.set_reveal_child(True)
+
+            progressbar = builder.get_object("infobar_progress")
+            progressbar.set_tooltip_text("Scrobbling on {}%".format(self.tracker.percentage))
+            progressbar.set_fraction(percent/100)
+        else:
+            logging.debug("SCROBBLED", txt)
 
 class loginWindow(Gtk.Dialog):
     def __init__(self):
@@ -140,6 +189,9 @@ class loginWindow(Gtk.Dialog):
 
 class daemonWindow(Gtk.Window):
     pass
+
+def restart(*args):
+    os.execl(sys.executable, sys.executable, *sys.argv)
 
 def exit(*args):
     print("Window closed, exiting program")

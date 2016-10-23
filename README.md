@@ -5,6 +5,10 @@ Based on trackma (https://github.com/z411/trackma)
 
 ## TODO
 [x] Autodetect file and scrobble it
+[x] Gtk Interface
+
+## SCREENSHOTS
+![alt tag](https://i.gyazo.com/c4e1b73375bdecbce1a243508471e0a6.png)
 
 ## DONATIONS
 

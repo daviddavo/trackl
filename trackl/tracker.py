@@ -35,13 +35,14 @@ def get_sec(time_str):
     return int(h) * 3600 + int(m) * 60 + int(s) + int(cs)/100
 
 class Tracker():
-    def __init__(self, player="mpv,vlc", percentage=70, wait_s=20):
+    def __init__(self, interface, player="mpv|vlc", percentage=70, wait_s=1):
         self.process_name = "simkl-pytracker-{}".format(player)
         self.wait_s = wait_s
         self.wait_close = 100
         self.player = player
         self.trackingfile = None
         self.percentage = percentage
+        self.interface = interface
         tracker_args = 0
         tracker_t = threading.Thread(target=self._tracker)#, args=tracker_args)
         tracker_t.name = self.process_name
@@ -49,30 +50,28 @@ class Tracker():
 
         self.active = True
         tracker_t.start()
-        tracker_t.join()
 
     def _get_playing_file_lsof(self, player):
-        for i in player.split(","):
-            try:
-                lsof = subprocess.Popen(['lsof', '+w', '-n', '-c', ''.join(
-                    ['/', player, '/']), '-Fn'], stdout=subprocess.PIPE)
-            except OSError:
-                return False
+        try:
+            lsof = subprocess.Popen(['lsof', '+w', '-n', '-c', ''.join(
+                ['/', player, '/']), '-Fn'], stdout=subprocess.PIPE)
+        except OSError:
+            return False
 
-            output = lsof.communicate()[0].decode('utf-8')
-            fileregex = re.compile("n(.*(\.mkv|\.mp4|\.avi))")
+        output = lsof.communicate()[0].decode('utf-8')
+        fileregex = re.compile("n(.*(\.mkv|\.mp4|\.avi))")
 
-            for line in output.splitlines():
-                match = fileregex.match(line)
-                if match is not None:
-                    trcfile = dict()
-                    trcfile["abspath"] = os.path.abspath(match.group(1))
-                    trcfile["videolen"] = get_sec(self._getvideolen(trcfile["abspath"]))
-                    trcfile["filename"] = os.path.basename(match.group(1))
-                    trcfile["added"]    = time.time()
-                    print("Path:", trcfile["abspath"])
-                    print("Video len:", self._getvideolen(trcfile["abspath"]))
-                    return trcfile
+        for line in output.splitlines():
+            match = fileregex.match(line)
+            if match is not None:
+                trcfile = dict()
+                trcfile["abspath"] = os.path.abspath(match.group(1))
+                trcfile["videolen"] = get_sec(self._getvideolen(trcfile["abspath"]))
+                trcfile["filename"] = os.path.basename(match.group(1))
+                trcfile["added"]    = time.time()
+                print("Path:", trcfile["abspath"])
+                print("Video len:", self._getvideolen(trcfile["abspath"]))
+                return trcfile
 
         return False
 
@@ -86,6 +85,7 @@ class Tracker():
         while self.active:
             filename = self._get_playing_file_lsof(self.player)
             print(filename)
+            pct = 0 
             if filename != False:
                 if self.trackingfile == None:
                     #[FILENAME, startime, exptime]
@@ -95,8 +95,10 @@ class Tracker():
                     if g["type"] == "episode":
                         txt += "\nS{}E{}".format(str(g["season"]).zfill(2),
                              str(g["episode"]).zfill(2))
+                        self.trackingfile["txt"] = txt
                     subprocess.Popen(['notify-send', "-i", "tmp.png", txt])
                     self.trackingfile["scrobbled"] = False
+                    self.trackingfile["type"] = g["type"]
                 else:
                     pct = ( time.time() - self.trackingfile["added"] ) \
                     /self.trackingfile["videolen"] * 100
@@ -117,9 +119,11 @@ class Tracker():
                         n = notify.Notification(txt, icon="trackl/resources/logo_simkl_black_with_white_bg.png")
                         n.show()
                         self.trackingfile["scrobbled"] = True
+
                     elif self.trackingfile["scrobbled"]:
-                        pass
-                    
+                        self.interface._update_scrobbling(finished=True)
+                
+                self.interface._update_scrobbling(txt,pct)
             else:
                 self.trackingfile = None
 
