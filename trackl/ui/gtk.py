@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
-import os, sys, logging
+import os, sys, logging,time
 import xml.etree.ElementTree as xmltree
 import urllib.request
 
@@ -73,7 +73,7 @@ class mainWindow(Gtk.Window):
         self.engine = apiconnect.Engine()
         self.show_watched()
         builder.get_object("label-username").set_text(apiconnect.username)
-        self.tracker = tracker.Tracker(self)
+        self.tracker = tracker.Tracker(self, percentage=70, wait_s=10)
 
     def show_watched(self):
         self.tree_dic = dict()
@@ -110,7 +110,9 @@ class mainWindow(Gtk.Window):
             treeview = widget.get_tree_view()
 
             showname = treeview.get_model().get_value(widget.get_selected()[1],0)
+            rate = treeview.get_model().get_value(widget.get_selected()[1],2)
             builder.get_object("label-showname").set_text(showname)
+            builder.get_object("label-rating").set_text("  " + rate + "  ")
 
             '''
             url = "http://3g28wn33sno63ljjq514qr87.wpengine.netdna-cdn.com/wp-content/uploads/2015/10/Star-Wars-Poster-700x1068.jpg"
@@ -153,18 +155,36 @@ class mainWindow(Gtk.Window):
         aks.remove(event.keyval)
 
     def _update_scrobbling(self, txt, percent=0,finished=False):
-        if not finished:
-            infobar = builder.get_object("infobar")
-            inforevealer = builder.get_object("inforevealer")
-            label = builder.get_object("infobar_label")
-            label.set_text(txt.replace("\n", " "))
-            inforevealer.set_reveal_child(True)
+        infobar = builder.get_object("infobar")
+        inforevealer = builder.get_object("inforevealer")
+        progressbar = builder.get_object("infobar_progress")
+        label = builder.get_object("infobar_label")
 
-            progressbar = builder.get_object("infobar_progress")
+        if False == inforevealer.get_reveal_child() and percent >= 0:
+            time.sleep(.1)
+            inforevealer.set_reveal_child(True)
+        elif inforevealer.get_reveal_child() and percent < 0:
+            time.sleep(.1)
+            inforevealer.set_reveal_child(False)
+
+        if not finished:
+            if infobar.get_message_type() != Gtk.MessageType.WARNING:
+                infobar.set_message_type(Gtk.MessageType.WARNING)
+            
             progressbar.set_tooltip_text("Scrobbling on {}%".format(self.tracker.percentage))
-            progressbar.set_fraction(percent/100)
+
         else:
-            logging.debug("SCROBBLED", txt)
+            logging.debug("SCROBBLED" + txt)
+            print("SCROBBLED")
+            if infobar.get_message_type() != Gtk.MessageType.INFO:
+                infobar.set_message_type(Gtk.MessageType.INFO)
+            progressbar.set_tooltip_text("Scrobbled")
+        
+        label.set_text(str(txt.replace("\n", " ")))
+
+        progressbar.set_fraction(percent/100)
+        
+        print("IBR:", infobar.get_message_type())
 
 class loginWindow(Gtk.Dialog):
     def __init__(self):

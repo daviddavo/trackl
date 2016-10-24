@@ -35,7 +35,7 @@ def get_sec(time_str):
     return int(h) * 3600 + int(m) * 60 + int(s) + int(cs)/100
 
 class Tracker():
-    def __init__(self, interface, player="mpv|vlc", percentage=70, wait_s=1):
+    def __init__(self, interface, player="mpv|vlc", percentage=60, wait_s=10):
         self.process_name = "simkl-pytracker-{}".format(player)
         self.wait_s = wait_s
         self.wait_close = 100
@@ -85,7 +85,7 @@ class Tracker():
         while self.active:
             filename = self._get_playing_file_lsof(self.player)
             print(filename)
-            pct = 0 
+            pct,finished = 0, False
             if filename != False:
                 if self.trackingfile == None:
                     #[FILENAME, startime, exptime]
@@ -119,17 +119,20 @@ class Tracker():
                         n = notify.Notification(txt, icon="trackl/resources/logo_simkl_black_with_white_bg.png")
                         n.show()
                         self.trackingfile["scrobbled"] = True
+                        finished = True
 
                     elif self.trackingfile["scrobbled"]:
-                        self.interface._update_scrobbling(finished=True)
+                        finished = True
                 
-                self.interface._update_scrobbling(txt,pct)
+                self.interface._update_scrobbling(txt,pct,finished=finished)
             else:
+                self.interface._update_scrobbling("EMDHY", -1)
                 self.trackingfile = None
 
             try:
                 time.sleep(self.wait_s)
             except KeyboardInterrupt:
+                self.interface._update_scrobbling()
                 logging.info("Daemon stop")
                 print("Daemon stopped")
 
