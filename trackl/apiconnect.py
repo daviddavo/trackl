@@ -40,9 +40,13 @@ headers = {"Content-Type": "application/json",
 
 class Engine:
     def __init__(self):
-        pass
+        #The engine should have a list or table. And then we modify that
+        #table. If we do changes, we don't do it to simkl directly. We
+        #do it to the table (or dict) and after 5 mins or 5 changes (or
+        #on exit) we commit the table to simkl.
+        self.wdic = self.get_watched()
 
-    def get_watched(self, typestring):
+    def get_watched(self, typestring=""):
         con = http.client.HTTPSConnection("api.simkl.com")
         headers["authorization"] = logged()
         con.request("GET", "/sync/all-watched/" + typestring, headers=headers)

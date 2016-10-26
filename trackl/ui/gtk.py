@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
-import os, sys, logging,time
+import os, sys, logging, time, re
 import xml.etree.ElementTree as xmltree
 import urllib.request
 
@@ -73,46 +73,94 @@ class mainWindow(Gtk.Window):
         self.engine = apiconnect.Engine()
         self.show_watched()
         builder.get_object("label-username").set_text(apiconnect.username)
-        self.tracker = tracker.Tracker(self, percentage=70, wait_s=10)
+        self.tracker = tracker.Tracker(self, percentage=60, wait_s=10)
 
     def show_watched(self):
         self.tree_dic = dict()
+        show_color = "#3F51B5"
+        movie_color = "#1B5E20"
+        anime_color = "#3F51B5" #CURRENTLY NOT IN USE
+
+        def sortf(model, row1, row2, user_data):
+            nohtml = re.compile("<.*?>")
+            sort_column, _ = model.get_sort_column_id()
+            value1 = re.sub(nohtml, "", model.get_value(row1, sort_column))
+            value2 = re.sub(nohtml, "", model.get_value(row2, sort_column))
+            if value1 < value2:
+                return -1
+            elif value1 == value2:
+                return 0
+            else:
+                return 1
+
         for each in ["watching", "completed", "plantowatch", "dropped"]:
             self.tree_dic[each] = (builder.get_object(each + "-treeview"),
                 Gtk.ListStore(str, str, str, str, str))
+            #0 for TreeView, 1 for ListStore
             self.tree_dic[each][0].set_model(self.tree_dic[each][1])
+            self.tree_dic[each][1].set_sort_func(0, sortf, None)
 
-        for i, column_title in enumerate(["Title", "Next", "Score",
-            "Status", "Type"]):
-            for row in self.tree_dic.values():
+
+        for tree in self.tree_dic.values():
+            for i, column_title in enumerate(["Title", "Last Seen", "Score",
+                "Status", "Type"]):
                 renderer = Gtk.CellRendererText()
-                column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+                column = Gtk.TreeViewColumn(column_title, renderer, text=i, markup=i)
                 column.set_sort_column_id(i)
-                row[0].append_column(column)
+                column.set_resizable(True)
+                tree[0].append_column(column)
+                #renderer.set_property("foreground", show_color)
 
-        wdic = self.engine.get_watched("")
-        #print(wdic)
+        wdic = self.engine.wdic
+        print(wdic)
         for x in wdic:
             for lst in wdic[x]:
                 #print(lst)
                 st = [x for x in list(lst.keys()) if x in ["movie", "show"]][0]
                 logging.debug(lst[st])
-                nxt = "None"
-                if not st == "movie":
-                    nxt = "S{SEASON}E{EPISODE}"
+                nxt = "None" #Last seen episodes
+                if st == "show" and lst[st]["status"] == "watching":
+                    #print("\n",lst["seasons"])
+                    try:
+                        season  = max( [x["number"] for x in lst["seasons"]] )
+                        episode = max( [x["number"] for x in lst["seasons"][season-1]["episodes"]] )
+                    except:
+                        season  = "00"
+                        episode = "RROR"
+                    nxt = "S{}E{}".format(str(season).zfill(2), 
+                        str(episode).zfill(2))
+
                 tmplst = [
                     lst[st]['title'], nxt, str(lst[st]["rate"]), lst[st]["status"], st
                 ]
                 #print(tmplst)
+                for i,ls in enumerate(tmplst):
+                    color = show_color
+                    if st == "movie":
+                        color = movie_color
+                    tmplst[i] = "<span color='{}'>{}</span>".format(color, ls)
+                #print(tmplst)
                 row = self.tree_dic[lst[st]["status"]][1].append(tmplst)
 
         def on_select(widget, *args):
+            tmpdic = {"watching":0, "completed":1, "plantowatch":2, "dropped":3}
             treeview = widget.get_tree_view()
 
-            showname = treeview.get_model().get_value(widget.get_selected()[1],0)
+            nohtml = re.compile("<.*?>")
+            showname = re.sub(nohtml, "", treeview.get_model().get_value(widget.get_selected()[1],0))
             rate = treeview.get_model().get_value(widget.get_selected()[1],2)
             builder.get_object("label-showname").set_text(showname)
-            builder.get_object("label-rating").set_text("  " + rate + "  ")
+            status = treeview.get_model().get_value(widget.get_selected()[1],3)
+            status = re.sub(nohtml, "", status)
+            builder.get_object("combobox-status").set_active(tmpdic[status])
+            spinbutton  = builder.get_object("score-spinbutton")
+            spinadjust = spinbutton.get_adjustment()
+            spinadjust.set_value(8)
+            spinbutton.set_value(8)
+            try:
+                pass
+            except:
+                builder.get_object("score-spinbutton").set_value()
 
             '''
             url = "http://3g28wn33sno63ljjq514qr87.wpengine.netdna-cdn.com/wp-content/uploads/2015/10/Star-Wars-Poster-700x1068.jpg"
@@ -171,20 +219,25 @@ class mainWindow(Gtk.Window):
             if infobar.get_message_type() != Gtk.MessageType.WARNING:
                 infobar.set_message_type(Gtk.MessageType.WARNING)
             
-            progressbar.set_tooltip_text("Scrobbling on {}%".format(self.tracker.percentage))
+            infobar.set_tooltip_text("Scrobbling on {}%".format(self.tracker.percentage))
 
         else:
             logging.debug("SCROBBLED" + txt)
             print("SCROBBLED")
             if infobar.get_message_type() != Gtk.MessageType.INFO:
                 infobar.set_message_type(Gtk.MessageType.INFO)
-            progressbar.set_tooltip_text("Scrobbled")
+            infobar.set_tooltip_text("Scrobbled")
         
         label.set_text(str(txt.replace("\n", " ")))
 
-        progressbar.set_fraction(percent/100)
+        progressbar.set_fraction(min(1, percent/100))
+        progressbar.set_text(str(min(100,round(percent,3))) + "%")
         
         print("IBR:", infobar.get_message_type())
+
+    def send_to_statusbar(self, txt):
+        stbar = builder.get_object("statusbar")
+        stbar.push(0, txt)
 
 class loginWindow(Gtk.Dialog):
     def __init__(self):
@@ -217,7 +270,7 @@ def exit(*args):
     print("Window closed, exiting program")
     Gtk.main_quit()
 
-if __name__ == "__main__":
+def main():
     if apiconnect.logged == False:
         print("Logging in")
     else:
@@ -227,3 +280,5 @@ if __name__ == "__main__":
         #w = loginWindow()
         #print(w.run())
     Gtk.main()
+if __name__ == "__main__":
+    main()

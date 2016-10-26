@@ -95,7 +95,7 @@ class Tracker():
                     if g["type"] == "episode":
                         txt += "\nS{}E{}".format(str(g["season"]).zfill(2),
                              str(g["episode"]).zfill(2))
-                        self.trackingfile["txt"] = txt
+                    self.trackingfile["txt"] = txt
                     subprocess.Popen(['notify-send', "-i", "tmp.png", txt])
                     self.trackingfile["scrobbled"] = False
                     self.trackingfile["type"] = g["type"]
