@@ -18,6 +18,7 @@
 import os, sys, logging, time, re
 import xml.etree.ElementTree as xmltree
 import urllib.request
+import json
 
 from trackl import tracker
 from trackl import apiconnect
@@ -112,6 +113,8 @@ class mainWindow(Gtk.Window):
                 #renderer.set_property("foreground", show_color)
 
         wdic = self.engine.wdic
+        with open("tmp.json", "w") as f:
+            f.write(json.dumps(wdic, indent=2))
         print(wdic)
         for x in wdic:
             for lst in wdic[x]:
@@ -119,7 +122,7 @@ class mainWindow(Gtk.Window):
                 st = [x for x in list(lst.keys()) if x in ["movie", "show"]][0]
                 logging.debug(lst[st])
                 nxt = "None" #Last seen episodes
-                if st == "show" and lst[st]["status"] == "watching":
+                if st == "show" and lst["status"] == "watching":
                     #print("\n",lst["seasons"])
                     try:
                         season  = max( [x["number"] for x in lst["seasons"]] )
@@ -127,11 +130,11 @@ class mainWindow(Gtk.Window):
                     except:
                         season  = "00"
                         episode = "RROR"
-                    nxt = "S{}E{}".format(str(season).zfill(2), 
-                        str(episode).zfill(2))
+                if st=="show":
+                    nxt = lst["last_watched"]
 
                 tmplst = [
-                    lst[st]['title'], nxt, str(lst[st]["rate"]), lst[st]["status"], st
+                    lst[st]['title'], nxt, str(lst["user_rating"]), lst["status"], st
                 ]
                 #print(tmplst)
                 for i,ls in enumerate(tmplst):
@@ -140,7 +143,7 @@ class mainWindow(Gtk.Window):
                         color = movie_color
                     tmplst[i] = "<span color='{}'>{}</span>".format(color, ls)
                 #print(tmplst)
-                row = self.tree_dic[lst[st]["status"]][1].append(tmplst)
+                row = self.tree_dic[lst["status"]][1].append(tmplst)
 
         def on_select(widget, *args):
             tmpdic = {"watching":0, "completed":1, "plantowatch":2, "dropped":3}
